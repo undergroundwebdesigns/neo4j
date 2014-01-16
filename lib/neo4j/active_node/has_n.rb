@@ -106,11 +106,11 @@ module Neo4j::ActiveNode
       # @return [Neo4j::ActiveNode::HasN::DeclRel] a DSL object where the has_one relationship can be futher specified
       def has_one(rel_type)
         clazz = self
-        module_eval(%Q{def #{rel_type}=(value)
+        module_eval(%Q{def #{rel_type}=(value, rel_props = {})
                   dsl = _decl_rels_for(:#{rel_type})
                   rel = dsl.single_relationship(self)
                   rel && rel.del
-                  dsl.create_relationship_to(self, value) if value
+                  dsl.create_relationship_to(self, value, rel_props) if value
               end}, __FILE__, __LINE__)
 
         module_eval(%Q{def #{rel_type}

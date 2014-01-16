@@ -73,10 +73,21 @@ describe "has_n" do
       it 'creates a new relationship' do
         a_node = double("a node")
 
-        node.should_receive(:create_rel).with(:friends, a_node)
+        node.should_receive(:create_rel).with(:friends, a_node, {})
 
         # when
         node.friends << a_node
+      end
+    end
+
+    describe 'node.friends.create(a_node, props)' do
+      it 'creates a new relationship with properties' do
+        a_node = double("a node")
+        props = {met: Date.new}
+
+        node.should_receive(:create_rel).with(:friends, a_node, props)
+
+        node.friends.create(a_node, props)
       end
     end
 
