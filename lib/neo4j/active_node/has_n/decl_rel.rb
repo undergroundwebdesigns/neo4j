@@ -225,9 +225,9 @@ module Neo4j
         end
 
         # @private
-        def create_relationship_to(node, other) # :nodoc:
+        def create_relationship_to(node, other, props) # :nodoc:
           from, to = incoming? ? [other, node] : [node, other]
-          from.create_rel(@rel_type, to)
+          from.create_rel(@rel_type, to, props)
         end
 
       end

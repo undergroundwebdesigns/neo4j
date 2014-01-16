@@ -23,3 +23,30 @@ class Neo4j::Node
   end
 
 end
+
+class Neo4j::Relationship
+  module Wrapper
+    def wrapper
+      data = load_resource.symbolize_keys
+
+      wrapper = _class_wrapper(data)
+      if wrapper
+        wrapped_relationship = wrapper.new
+        wrapped_relationship.init_on_load(self, data[:data])
+        wrapped_relationship
+      else
+        self
+      end
+    end
+
+    def _class_wrapper(data)
+      type = data[:type]
+
+      if type =~ /#/
+        _ , type = type.split("#")
+      end
+
+      Neo4j::ActiveRelationship::Types._wrapped_types[type.to_sym]
+    end
+  end
+end
