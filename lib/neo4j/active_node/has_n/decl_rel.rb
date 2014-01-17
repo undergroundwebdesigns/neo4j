@@ -31,13 +31,13 @@ module Neo4j
       # <b>File#folder</b> ::       for accessing nodes from relationship 'files' from the outgoing Folder node
       #
       class DeclRel
-        attr_reader :source_class, :dir, :rel_type, :method_id
+        attr_reader :source_class, :dir, :rel_name, :method_id
 
         def initialize(method_id, has_one, source_class)
           @method_id = method_id
           @has_one = has_one
           @dir = :outgoing
-          @rel_type = method_id.to_sym
+          @rel_name = method_id.to_sym
           @source_class = source_class
         end
 
@@ -46,15 +46,15 @@ module Neo4j
           dr = DeclRel.new(@method_id, @has_one, @source_class)
           dr.instance_eval do
             @dir = base.dir
-            @rel_type = base.rel_type
-            @target_name = base.target_name if base.target_name
+            @rel_name = base.rel_name
+            @target_class = base.target_class if base.target_class
             @source_class = base.source_class
           end
           dr
         end
 
         def to_s
-          "DeclRel #{object_id} dir: #{@dir} rel_id: #{@method_id}, rel_type: #{@rel_type}, target_class:#{@target_name}"
+          "DeclRel #{object_id} dir: #{@dir} rel_id: #{@method_id}, rel_name: #{rel_name}, target_class:#{@target_class.to_s}"
         end
 
         # @return [true, false]
@@ -109,21 +109,22 @@ module Neo4j
         # @param [Class, String, Symbol] target the other class to which this relationship goes (if String or Class) or the relationship (if Symbol)
         # @param [String, Symbol] rel_type the rel_type postfix for the relationships, which defaults to the same as the has_n/one method id
         # @return self
-        def to(target, rel_type = @method_id)
+        def to(target = nil)
           @dir = :outgoing
 
-          case target
-            when /#/
-              @target_name, _ = target.to_s.split("#")
-              @rel_type = target.to_sym
-            when Class, String
-              @target_name = target.to_s
-              @rel_type = "#{@source_class}##{rel_type}".to_sym
-            when Symbol
-              @target_name = nil
-              @rel_type = target.to_sym
-            else
-              raise "Expected a class or a symbol for, got #{target}/#{target.class}"
+          if target
+            case target
+              when Class
+                @target_class = target
+              when String, Symbol
+                begin
+                  @target_class = target.to_s.constantize
+                rescue NameError
+                  raise "No such class found: #{target}."
+                end
+              else
+                raise "Expected a class, symbol or string, got #{target}"
+            end
           end
           self
         end
@@ -165,35 +166,38 @@ module Neo4j
         #   file.folder = FolderNode.new
         #
         #
-        def from(target, rel_type=@method_id)
+        def from(target = nil)
           @dir = :incoming
 
-          case target
-            when /#/
-              @target_name, _ = target.to_s.split("#")
-              @rel_type = target
-            when Class, String
-              @target_name = target.to_s
-              @rel_type = "#{@target_name}##{rel_type}".to_sym
-            when Symbol
-              @target_name = nil
-              @rel_type = target.to_sym
-            else
-              raise "Expected a class or a symbol for, got #{target}/#{target.class}"
+          if target
+            case target
+              when Class
+                @target_class = target
+              when String, Symbol
+                begin
+                  @target_class = target.to_s.constantize
+                rescue NameError
+                  raise "No such class found: #{target}."
+                end
+              else
+                raise "Expected a class, symbol or string, got #{target}"
+            end
           end
           self
         end
 
-
-        # @private
-        def target_name
-          @target_name
+        def relationship(rel_name)
+          @rel_name = rel_name.to_s.to_sym
+          self
         end
 
-        def target_class
-          @target_name && @target_name.split("::").inject(Kernel) { |container, name| container.const_get(name.to_s) }
+        def rel_type
+          if (@target_class)
+            "#{rel_name.to_s}##{@target_class.to_s}"
+          else
+            rel_name.to_s
+          end
         end
-
 
         # @private
         def each_node(node, &block)
@@ -226,8 +230,11 @@ module Neo4j
 
         # @private
         def create_relationship_to(node, other, props) # :nodoc:
+          if @target_class && !other.is_a?(@target_class)
+            raise "Relationship #{node.class.name}##{method_id} expects objects of class #{@target_class.to_s}, but #{other} is a #{other.class}. Relationship cannot be created."
+          end
           from, to = incoming? ? [other, node] : [node, other]
-          from.create_rel(@rel_type, to, props)
+          from.create_rel(rel_type, to, props)
         end
 
       end
