@@ -43,7 +43,7 @@ class Neo4j::Relationship
       type = data[:type]
 
       if type =~ /#/
-        type, _ = type.split("#")
+        _, type = type.split("#")
       end
 
       Neo4j::ActiveRelationship::Types._wrapped_types[type.to_sym]

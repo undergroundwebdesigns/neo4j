@@ -31,7 +31,7 @@ module Neo4j
       # <b>File#folder</b> ::       for accessing nodes from relationship 'files' from the outgoing Folder node
       #
       class DeclRel
-        attr_reader :source_class, :dir, :rel_name, :method_id
+        attr_reader :source_class, :dir, :rel_name, :method_id, :target_class_name
 
         def initialize(method_id, has_one, source_class)
           @method_id = method_id
@@ -47,6 +47,7 @@ module Neo4j
           dr.instance_eval do
             @dir = base.dir
             @rel_name = base.rel_name
+            @target_class_name = base.target_class_name
             @target_class = base.target_class if base.target_class
             @source_class = base.source_class
           end
@@ -54,7 +55,7 @@ module Neo4j
         end
 
         def to_s
-          "DeclRel #{object_id} dir: #{@dir} rel_id: #{@method_id}, rel_name: #{rel_name}, target_class:#{@target_class.to_s}"
+          "DeclRel #{object_id} dir: #{@dir} rel_id: #{@method_id}, rel_name: #{rel_name}, target_class:#{target_class.to_s}"
         end
 
         # @return [true, false]
@@ -111,17 +112,13 @@ module Neo4j
         # @return self
         def to(target = nil)
           @dir = :outgoing
-
           if target
             case target
               when Class
                 @target_class = target
+                @target_class_name = target.to_s
               when String, Symbol
-                begin
-                  @target_class = target.to_s.constantize
-                rescue NameError
-                  raise "No such class found: #{target}."
-                end
+                @target_class_name = target.to_s
               else
                 raise "Expected a class, symbol or string, got #{target}"
             end
@@ -168,17 +165,15 @@ module Neo4j
         #
         def from(target = nil)
           @dir = :incoming
-
           if target
             case target
+              when /#/
+                @target_class_name, @rel_name = target.to_s.split("#")
               when Class
                 @target_class = target
+                @target_class_name = target.to_s
               when String, Symbol
-                begin
-                  @target_class = target.to_s.constantize
-                rescue NameError
-                  raise "No such class found: #{target}."
-                end
+                @target_class_name = target.to_s
               else
                 raise "Expected a class, symbol or string, got #{target}"
             end
@@ -192,11 +187,17 @@ module Neo4j
         end
 
         def rel_type
-          if (@target_class)
-            "#{rel_name.to_s}##{@target_class.to_s}"
+          if (target_class)
+            "#{target_class.to_s}##{rel_name.to_s}".to_sym
           else
-            rel_name.to_s
+            rel_name.to_sym
           end
+        end
+
+        def target_class
+          @target_class || (target_class_name ? target_class_name.constantize : nil)
+        rescue NameError
+          raise "Target class for relation #{method_id} not found. Class #{target_class_name} doesn't exist."
         end
 
         # @private
@@ -205,8 +206,7 @@ module Neo4j
         end
 
         def all_relationships(node)
-          # TODO fix ruby warning - warning: Enumerator.new without a block is deprecated; use Object#to_enum
-          Enumerator.new(self, :each_rel, node)
+          self.to_enum(:each_rel, node)
         end
 
         def each_rel(node, &block) #:nodoc:
@@ -230,8 +230,8 @@ module Neo4j
 
         # @private
         def create_relationship_to(node, other, props) # :nodoc:
-          if @target_class && !other.is_a?(@target_class)
-            raise "Relationship #{node.class.name}##{method_id} expects objects of class #{@target_class.to_s}, but #{other} is a #{other.class}. Relationship cannot be created."
+          if target_class && !other.is_a?(target_class)
+            raise "Relationship #{node.class.name}##{method_id} expects objects of class #{target_class.to_s}, but #{other} is a #{other.class}. Relationship cannot be created."
           end
           from, to = incoming? ? [other, node] : [node, other]
           from.create_rel(rel_type, to, props)

@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe "has_one" do
 
-  describe 'has_one(:parent).from(:children)' do
+  describe 'has_one(:parent).from.relationship(:children)' do
     class HasOneA
       include Neo4j::ActiveNode
       property :name
@@ -12,7 +12,7 @@ describe "has_one" do
     class HasOneB
       include Neo4j::ActiveNode
       property :name
-      has_one(:parent).from(:children)
+      has_one(:parent).from.relationship(:children)
     end
 
     it 'find the nodes via the has_one accessor' do

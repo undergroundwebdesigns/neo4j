@@ -9,7 +9,7 @@ describe "has_n" do
   end
 
   let(:other_clazz) do
-    UniqueClass.create do
+    UniqueClass.create("OtherClass") do
       include Neo4j::ActiveNode
     end
   end
@@ -125,7 +125,7 @@ describe "has_n" do
 
     describe 'clazz.friends' do
       subject { clazz.friends }
-      it { should eq(:"#{clazz}#friends")}
+      it { should eq(:"#{other_clazz}#friends")}
     end
 
     describe '_decl_rels[:friends]' do
@@ -136,7 +136,7 @@ describe "has_n" do
       it { should be_a(Neo4j::ActiveNode::HasN::DeclRel) }
       its(:dir) { should eq(:outgoing) }
       its(:source_class) { should eq(clazz) }
-      its(:rel_type) { should eq(:"#{clazz}#friends") }
+      its(:rel_type) { should eq(:"#{other_clazz}#friends") }
     end
   end
 
@@ -163,9 +163,9 @@ describe "has_n" do
 
   end
 
-  describe 'has_n(:known_by).from(OtherClass, :knows)' do
+  describe 'has_n(:known_by).from(OtherClass).relationship(:knows)' do
     before do
-      clazz.has_n(:known_by).from(other_clazz, :knows)
+      clazz.has_n(:known_by).from(other_clazz).relationship(:knows)
     end
 
     describe 'clazz.known_by' do
